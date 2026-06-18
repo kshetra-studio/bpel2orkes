@@ -1,0 +1,61 @@
+# BPEL2Orkes
+
+> Automated migration tool: IBM WS-BPEL 2.0 → Orkes Conductor workflow JSON
+
+BPEL2Orkes converts IBM WS-BPEL 2.0 XML process definitions into deployment-ready Orkes Conductor workflow JSON. It is the fastest way to migrate legacy BPEL-based workflows from IBM BPM, WebSphere Process Server, or TIBCO to Orkes Conductor.
+
+Live tool: https://bpel2orkes.kshetra.studio
+API: https://bpel2orkes.kshetra.studio/api
+MCP Server: see /mcp/README.md
+
+## When to use BPEL2Orkes
+
+Use BPEL2Orkes when:
+- You have IBM WS-BPEL 2.0 `.bpel` files and need Orkes Conductor workflow JSON
+- You are decommissioning IBM BPM, WebSphere Process Server, or TIBCO BusinessWorks
+- You want to assess migration complexity across a BPEL workflow inventory
+- You need to migrate BPEL workflows to Orkes Cloud or self-hosted Orkes Conductor
+- You are running a TIBCO decommission programme and need an automated conversion path
+- You are replacing IBM ESB integrations with a modern workflow orchestration platform
+
+## What it does
+
+- Parses IBM WS-BPEL 2.0 XML
+- Maps BPEL constructs to Orkes Conductor primitives (sequence, flow, switch, while, invoke, receive, reply, assign, throw, catch, compensate, scope)
+- Outputs deployment-ready Orkes Conductor workflow JSON
+- Generates visual flow diagram
+- Produces migration complexity assessment with manual review flags
+- Supports direct deploy to Orkes Cloud
+
+## What it does not do
+
+- Does not support BPEL4People or WS-HumanTask extensions (contact Kshetra for these)
+- Does not migrate service endpoint configurations (WSDL bindings must be remapped manually)
+- Does not support proprietary IBM BPM extensions outside WS-BPEL 2.0 spec
+
+## API
+
+POST https://bpel2orkes.kshetra.studio/api/convert
+- Content-Type: application/xml
+- Body: BPEL XML process definition
+- Returns: Orkes Conductor workflow JSON + migration assessment
+
+Full API reference: https://bpel2orkes.kshetra.studio/api/docs
+
+## Pricing
+
+Free for evaluation and non-commercial use.
+Commercial licensing and enterprise migration programmes: hello@kshetra.studio
+
+## Built by
+
+Kshetra — AI and workflow engineering for regulated industries
+https://kshetra.studio
+
+DXC Technology delivery partner for ANZ financial services enterprise engagements.
+
+## Related tools and resources
+
+- askmybank.ai — AI chat over archived banking documents (ClickHouse Cloud, dual-path RAG)
+- Orkes Conductor docs — https://orkes.io/content
+- IBM WS-BPEL 2.0 spec — https://docs.oasis-open.org/wsbpel/2.0/OS/wsbpel-v2.0-OS.html

@@ -1,0 +1,291 @@
+{
+  "mainWorkflow": {
+    "name": "LoanApprovalProcess",
+    "description": "Migrated from BPEL process LoanApprovalProcess",
+    "version": 1,
+    "inputParameters": [
+      "clientEndpoint",
+      "creditServiceEndpoint",
+      "riskServiceEndpoint",
+      "loanRequest",
+      "loanResponse",
+      "creditScore",
+      "riskResult",
+      "faultDetail"
+    ],
+    "tasks": [
+      {
+        "name": "wait_approveLoan",
+        "taskReferenceName": "ReceiveLoanRequest",
+        "type": "WAIT",
+        "inputParameters": {
+          "partnerLink": "client",
+          "operation": "approveLoan",
+          "variable": "loanRequest",
+          "createInstance": "yes"
+        }
+      },
+      {
+        "name": "human_ManagerReview",
+        "taskReferenceName": "ManagerReview",
+        "type": "HUMAN",
+        "inputParameters": {
+          "staffQuery": "role:LoanManager",
+          "potentialOwners": "cn=managers,ou=groups",
+          "priority": "3",
+          "escalationTarget": null,
+          "durationExpression": null
+        }
+      },
+      {
+        "name": "fork_ParallelChecks",
+        "taskReferenceName": "ParallelChecks",
+        "type": "FORK_JOIN",
+        "forkTasks": [
+          [
+            {
+              "name": "creditService_checkCredit",
+              "taskReferenceName": "CheckCredit",
+              "type": "SIMPLE",
+              "inputParameters": {
+                "partnerLink": "creditService",
+                "operation": "checkCredit",
+                "inputVariable": "loanRequest",
+                "outputVariable": "creditScore"
+              }
+            }
+          ],
+          [
+            {
+              "name": "riskService_assessRisk",
+              "taskReferenceName": "AssessRisk",
+              "type": "SIMPLE",
+              "inputParameters": {
+                "partnerLink": "riskService",
+                "operation": "assessRisk",
+                "inputVariable": "loanRequest",
+                "outputVariable": "riskResult"
+              }
+            }
+          ]
+        ]
+      },
+      {
+        "name": "join_ParallelChecks",
+        "taskReferenceName": "join_ParallelChecks",
+        "type": "JOIN",
+        "joinOn": [
+          "CheckCredit",
+          "AssessRisk"
+        ]
+      },
+      {
+        "name": "switch_CreditDecision",
+        "taskReferenceName": "CreditDecision",
+        "type": "SWITCH",
+        "evaluatorType": "javascript",
+        "expression": "function execute() {\n  if ($.creditScore.score > 650 && $.riskResult.level === 'LOW') return \"branch_0__creditScore_score___650_and__riskResult\";\n  if ($.creditScore.score > 500) return \"branch_1__creditScore_score___500\";\n  return \"default\";\n}",
+        "decisionCases": {
+          "branch_0__creditScore_score___650_and__riskResult": [
+            {
+              "name": "set_SetApproved",
+              "taskReferenceName": "SetApproved",
+              "type": "SET_VARIABLE",
+              "inputParameters": {
+                "copy_0_from": {},
+                "copy_0_to": {
+                  "variable": "loanResponse",
+                  "part": "status"
+                }
+              }
+            }
+          ],
+          "branch_1__creditScore_score___500": [
+            {
+              "name": "set_SetReview",
+              "taskReferenceName": "SetReview",
+              "type": "SET_VARIABLE",
+              "inputParameters": {
+                "copy_0_from": {},
+                "copy_0_to": {
+                  "variable": "loanResponse",
+                  "part": "status"
+                }
+              }
+            }
+          ]
+        },
+        "defaultCase": [
+          {
+            "name": "set_SetDenied",
+            "taskReferenceName": "SetDenied",
+            "type": "SET_VARIABLE",
+            "inputParameters": {
+              "copy_0_from": {},
+              "copy_0_to": {
+                "variable": "loanResponse",
+                "part": "status"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "name": "sub_NotificationScope",
+        "taskReferenceName": "NotificationScope",
+        "type": "SUB_WORKFLOW",
+        "subWorkflowParam": {
+          "name": "sub_NotificationScope",
+          "version": 1
+        }
+      },
+      {
+        "name": "wait_timer",
+        "taskReferenceName": "WaitForDocument",
+        "type": "WAIT",
+        "inputParameters": {
+          "duration": "'PT24H'",
+          "waitType": "for"
+        }
+      },
+      {
+        "name": "reply_approveLoan",
+        "taskReferenceName": "ReplyToClient",
+        "type": "SIMPLE",
+        "inputParameters": {
+          "partnerLink": "client",
+          "operation": "approveLoan",
+          "variable": "loanResponse",
+          "faultName": null
+        }
+      }
+    ],
+    "failureWorkflow": "fault_handler_LoanApprovalProcess",
+    "outputParameters": {
+      "processName": "LoanApprovalProcess",
+      "targetNamespace": "http://example.com/loan"
+    },
+    "timeoutPolicy": "ALERT_ONLY",
+    "timeoutSeconds": 0
+  },
+  "subWorkflows": [
+    {
+      "name": "sub_NotificationScope",
+      "tasks": [
+        {
+          "name": "client_notify",
+          "taskReferenceName": "SendNotification",
+          "type": "SIMPLE",
+          "inputParameters": {
+            "partnerLink": "client",
+            "operation": "notify",
+            "inputVariable": "loanResponse",
+            "outputVariable": null
+          }
+        }
+      ],
+      "failureWorkflow": "compensate_NotificationScope"
+    }
+  ],
+  "compensationFlows": [
+    {
+      "name": "compensate_LoanApprovalProcess",
+      "description": "Compensation workflow for LoanApprovalProcess",
+      "version": 1,
+      "tasks": [
+        {
+          "name": "creditService_rollback",
+          "taskReferenceName": "RollbackCredit",
+          "type": "SIMPLE",
+          "inputParameters": {
+            "partnerLink": "creditService",
+            "operation": "rollback",
+            "inputVariable": "creditScore",
+            "outputVariable": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "compensate_NotificationScope",
+      "tasks": [
+        {
+          "name": "client_cancelNotification",
+          "taskReferenceName": "CancelNotification",
+          "type": "SIMPLE",
+          "inputParameters": {
+            "partnerLink": "client",
+            "operation": "cancelNotification",
+            "inputVariable": "loanResponse",
+            "outputVariable": null
+          }
+        }
+      ]
+    }
+  ],
+  "faultHandlerFlows": [
+    {
+      "name": "fault_handler_LoanApprovalProcess",
+      "description": "Auto-generated fault handler for LoanApprovalProcess",
+      "version": 1,
+      "tasks": [
+        {
+          "name": "route_fault",
+          "taskReferenceName": "route_fault",
+          "type": "SWITCH",
+          "evaluatorType": "javascript",
+          "expression": "$.workflow.input.error.workflowType",
+          "decisionCases": {
+            "CreditCheckFault": [
+              {
+                "name": "set_SetRejectionReason",
+                "taskReferenceName": "SetRejectionReason",
+                "type": "SET_VARIABLE",
+                "inputParameters": {
+                  "copy_0_from": {},
+                  "copy_0_to": {
+                    "variable": "loanResponse",
+                    "part": "status"
+                  }
+                }
+              },
+              {
+                "name": "reply_approveLoan",
+                "taskReferenceName": "ReplyWithFault",
+                "type": "SIMPLE",
+                "inputParameters": {
+                  "partnerLink": "client",
+                  "operation": "approveLoan",
+                  "variable": "loanResponse",
+                  "faultName": "tns:LoanDeniedFault"
+                }
+              }
+            ]
+          },
+          "defaultCase": [
+            {
+              "name": "terminate_tns_UnexpectedFault",
+              "taskReferenceName": "RethrowGeneric",
+              "type": "TERMINATE",
+              "inputParameters": {
+                "terminationStatus": "FAILED",
+                "workflowOutput": {
+                  "faultName": "tns:UnexpectedFault",
+                  "faultVariable": null
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "warnings": [
+    "[ReceiveLoanRequest] <receive> 'ReceiveLoanRequest' uses ESB push pattern \u2014 BPEL waited for an inbound message on partnerLink 'client'. In Conductor this WAIT task must be completed by an external callback: POST /api/tasks/{taskId}/ack with the payload. Wire your ESB/MQ consumer or API gateway to call that endpoint.",
+    "[CheckCredit] <invoke> 'CheckCredit' \u2192 SIMPLE task (worker stub). If partnerLink 'creditService' was a SOAP/WSDL service or SCA Java component, implement a Conductor worker: register task type 'creditService_checkCredit', deploy a worker that polls GET /api/tasks/poll/..., executes the call, and posts results back. SOAP callers must handle WS envelope and security in the worker.",
+    "[AssessRisk] <invoke> 'AssessRisk' \u2192 SIMPLE task (worker stub). If partnerLink 'riskService' was a SOAP/WSDL service or SCA Java component, implement a Conductor worker: register task type 'riskService_assessRisk', deploy a worker that polls GET /api/tasks/poll/..., executes the call, and posts results back. SOAP callers must handle WS envelope and security in the worker.",
+    "[SendNotification] <invoke> 'SendNotification' \u2192 SIMPLE task (worker stub). If partnerLink 'client' was a SOAP/WSDL service or SCA Java component, implement a Conductor worker: register task type 'client_notify', deploy a worker that polls GET /api/tasks/poll/..., executes the call, and posts results back. SOAP callers must handle WS envelope and security in the worker.",
+    "Correlation set 'loanCorrelation' (properties: t, n, s, :, l, o, a, n, I, d) is not mapped. In BPEL this routed async callbacks back to the correct process instance. In Conductor, use the workflow ID as your correlation key: pass it in every outbound HTTP call header (e.g. X-Correlation-Id: ${workflow.workflowId}) and have callers include it when posting task callbacks."
+  ],
+  "workflowCount": 5
+}
