@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.kshetra-studio/bpel2orkes",
+  "title": "BPEL2Orkes",
+  "description": "Convert IBM WS-BPEL 2.0 process definitions from WebSphere Process Server and BAW to Orkes Conductor workflow JSON automatically. Supports all 14 BPEL activity types, fault handlers, compensation flows, IBM BPELX extensions, and direct deploy to Orkes Cloud.",
+  "version": "0.2.0",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://bpel2orkes.kshetra.studio/mcp/",
+      "headers": [
+        {
+          "name": "X-Api-Key",
+          "description": "API key from bpel2orkes.kshetra.studio — sign in with GitHub for 50 free conversions, no credit card required.",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}
